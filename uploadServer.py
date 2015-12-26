@@ -43,4 +43,4 @@ if __name__ == "__main__":
     except OSError as exception:
         if exception.errno != errno.EEXIST:
             raise
-    app.run()
+    app.run(host='0.0.0.0')
