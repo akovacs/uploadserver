@@ -1,12 +1,13 @@
-import os
-from flask import Flask, request, redirect, url_for
+import os, errno
+from flask import Flask, request, redirect, url_for, send_from_directory
 from werkzeug import secure_filename
 
-UPLOAD_FOLDER = 'uploads/'
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = set(['txt', 'zip', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+#app.debug = True
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -36,4 +37,10 @@ def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == "__main__":
+    # check that uploads directory exists, if not then create it
+    try:
+        os.makedirs(UPLOAD_FOLDER)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
     app.run()
