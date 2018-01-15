@@ -3,6 +3,7 @@
 
 extern crate formdata;
 extern crate rocket;
+extern crate rocket_file_cache;
 extern crate time;
 
 use std::fs;
@@ -10,11 +11,12 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 use formdata::FormData;
-use rocket::{Data, Outcome, Request};
+use rocket::{Data, Outcome, Request, State};
 use rocket::data::{self, FromData};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::{Headers};
-use rocket::response::{content, NamedFile};
+use rocket::response::content;
+use rocket_file_cache::{Cache, CachedFile};
 
 const UPLOAD_DIR: &'static str = "uploads/";
 
@@ -79,17 +81,13 @@ fn index() -> content::Html<&'static str> {
 }
 
 #[get("/<file..>")]
-fn files(file: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(Path::new(UPLOAD_DIR).join(file)).ok()
+fn files(file: PathBuf, cache: State<Cache>) -> CachedFile {
+    CachedFile::open(Path::new(UPLOAD_DIR).join(file), cache.inner())
 }
 
 fn create_upload_directory() -> io::Result<bool> {
     fs::create_dir_all(UPLOAD_DIR)?;
     return Ok(true);
-}
-
-fn rocket() -> rocket::Rocket {
-    rocket::ignite().mount("/", routes![files, index, upload])
 }
 
 fn main() {
@@ -99,7 +97,9 @@ fn main() {
             process::exit(1);
         },
         Ok(_) => {
-            rocket().launch();
+            let cache: Cache = Cache::new(1024 * 1024 * 40); // 40 MB
+            rocket::ignite().manage(cache)
+                .mount("/", routes![files, index, upload]).launch();
         }
     }
 }
