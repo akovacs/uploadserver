@@ -2,31 +2,21 @@
 #![plugin(rocket_codegen)]
 
 extern crate formdata;
-#[macro_use]
-extern crate lazy_static;
 extern crate rocket;
 extern crate time;
 
-use std::env;
 use std::fs;
 use std::io;
-use std::path;
+use std::path::{Path, PathBuf};
 use std::process;
 use formdata::FormData;
 use rocket::{Data, Outcome, Request};
 use rocket::data::{self, FromData};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::{Headers};
-use rocket::response::content;
+use rocket::response::{content, NamedFile};
 
-const UPLOAD_DIR: &'static str = "uploads";
-lazy_static! {
-    static ref UPLOAD_PATH: path::PathBuf = {
-      let mut path = env::current_dir().unwrap();
-      path.push(UPLOAD_DIR);
-      path.to_owned()
-    };
-}
+const UPLOAD_DIR: &'static str = "uploads/";
 
 // Wrap formdata::FormData in order to implement FromData trait
 struct RocketFormData(FormData);
@@ -64,11 +54,11 @@ fn upload(upload: RocketFormData) -> io::Result<String> {
       _ => time::now().to_timespec().sec.to_string()
     };
     println!("Posted file fieldname={} name={} path={:?}", name, filename, file.path);
-    let mut upload_location = UPLOAD_PATH.clone();
-    upload_location.push(filename);
-    match fs::copy(&file.path, upload_location.as_path()) {
-      Ok(_) => return Ok(format!("Uploaded {}", upload_location.to_str().unwrap())),
-      Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Cannot write to {} directory due to {:?}", UPLOAD_DIR, e)))
+    let upload_location = Path::new(UPLOAD_DIR).join(&filename);
+    match fs::copy(&file.path, &upload_location) {
+      Ok(_) => return Ok(format!("Uploaded {}", filename)),
+      Err(error) => return Err(io::Error::new(io::ErrorKind::Other,
+                        format!("Cannot write to {} directory due to {:?}", UPLOAD_DIR, error)))
     };
   }
   return Err(io::Error::new(io::ErrorKind::InvalidInput, "No files uploaded"));
@@ -78,8 +68,8 @@ fn upload(upload: RocketFormData) -> io::Result<String> {
 fn index() -> content::Html<&'static str> {
   content::Html(r#"
     <!doctype html>
-    <title>Upload new File</title>
-    <h1>Upload new File</h1>
+    <title>Upload a file</title>
+    <h1>Upload a file</h1>
     <form action="" method=post enctype=multipart/form-data>
       <p><input type=file name=file>
          <input type=submit value=Upload>
@@ -88,13 +78,18 @@ fn index() -> content::Html<&'static str> {
   "#)
 }
 
+#[get("/<file..>")]
+fn files(file: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(Path::new(UPLOAD_DIR).join(file)).ok()
+}
+
 fn create_upload_directory() -> io::Result<bool> {
-    fs::create_dir_all(UPLOAD_PATH.as_path())?;
+    fs::create_dir_all(UPLOAD_DIR)?;
     return Ok(true);
 }
 
 fn rocket() -> rocket::Rocket {
-    rocket::ignite().mount("/", routes![index, upload])
+    rocket::ignite().mount("/", routes![files, index, upload])
 }
 
 fn main() {
