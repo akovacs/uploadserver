@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Arpad Kovacs <minhmeoke@gmail.com>"]
 
 [dependencies]
+formdata = "0.12.2"
 rocket = "0.3.6"
 rocket_codegen = "0.3.6"
