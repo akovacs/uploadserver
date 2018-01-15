@@ -2,11 +2,15 @@
 #![plugin(rocket_codegen)]
 
 extern crate formdata;
+#[macro_use]
+extern crate lazy_static;
 extern crate rocket;
+extern crate time;
 
 use std::env;
 use std::fs;
 use std::io;
+use std::path;
 use std::process;
 use formdata::FormData;
 use rocket::{Data, Outcome, Request};
@@ -16,6 +20,13 @@ use rocket::http::hyper::header::{Headers};
 use rocket::response::content;
 
 const UPLOAD_DIR: &'static str = "uploads";
+lazy_static! {
+    static ref UPLOAD_PATH: path::PathBuf = {
+      let mut path = env::current_dir().unwrap();
+      path.push(UPLOAD_DIR);
+      path.to_owned()
+    };
+}
 
 // Wrap formdata::FormData in order to implement FromData trait
 struct RocketFormData(FormData);
@@ -46,9 +57,19 @@ fn upload(upload: RocketFormData) -> io::Result<String> {
   for (name, value) in upload.0.fields {
     println!("Posted field name={} value={}", name, value);
   }
-  for (name, file) in upload.0.files {
-    println!("Posted file name={} path={:?}", name, file.path);
-    return Ok(format!("Uploaded {}", file.path.to_str().unwrap()));
+  for (name, mut file) in upload.0.files {
+    //file.do_not_delete_on_drop(); // don't delete temporary file
+    let filename = match file.filename() {
+      Ok(Some(original_filename)) => original_filename,
+      _ => time::now().to_timespec().sec.to_string()
+    };
+    println!("Posted file fieldname={} name={} path={:?}", name, filename, file.path);
+    let mut upload_location = UPLOAD_PATH.clone();
+    upload_location.push(filename);
+    match fs::copy(&file.path, upload_location.as_path()) {
+      Ok(_) => return Ok(format!("Uploaded {}", upload_location.to_str().unwrap())),
+      Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Cannot write to {} directory due to {:?}", UPLOAD_DIR, e)))
+    };
   }
   return Err(io::Error::new(io::ErrorKind::InvalidInput, "No files uploaded"));
 }
@@ -68,12 +89,9 @@ fn index() -> content::Html<&'static str> {
 }
 
 fn create_upload_directory() -> io::Result<bool> {
-    let mut path = env::current_dir()?;
-    path.push(UPLOAD_DIR);
-    fs::create_dir_all(path)?;
+    fs::create_dir_all(UPLOAD_PATH.as_path())?;
     return Ok(true);
 }
-
 
 fn rocket() -> rocket::Rocket {
     rocket::ignite().mount("/", routes![index, upload])
