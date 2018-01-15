@@ -4,13 +4,18 @@
 extern crate formdata;
 extern crate rocket;
 
+use std::env;
+use std::fs;
 use std::io;
+use std::process;
 use formdata::FormData;
 use rocket::{Data, Outcome, Request};
 use rocket::data::{self, FromData};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::{Headers};
 use rocket::response::content;
+
+const UPLOAD_DIR: &'static str = "uploads";
 
 // Wrap formdata::FormData in order to implement FromData trait
 struct RocketFormData(FormData);
@@ -62,10 +67,26 @@ fn index() -> content::Html<&'static str> {
   "#)
 }
 
+fn create_upload_directory() -> io::Result<bool> {
+    let mut path = env::current_dir()?;
+    path.push(UPLOAD_DIR);
+    fs::create_dir_all(path)?;
+    return Ok(true);
+}
+
+
 fn rocket() -> rocket::Rocket {
     rocket::ignite().mount("/", routes![index, upload])
 }
 
 fn main() {
-    rocket().launch();
+    match create_upload_directory() {
+        Err(error) => {
+            eprintln!("Could not create ./{} directory: {}", UPLOAD_DIR, error);
+            process::exit(1);
+        },
+        Ok(_) => {
+            rocket().launch();
+        }
+    }
 }
