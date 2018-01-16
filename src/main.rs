@@ -91,12 +91,30 @@ fn index() -> content::Html<&'static str> {
       if (window.File && window.FileList) {
         // Disable upload button.
         document.getElementById('upload').style.display='none';
- 
+
+        function updateProgress (transferEvent) {
+          if (transferEvent.lengthComputable) {
+            var percentComplete = (transferEvent.loaded / transferEvent.total * 100).toFixed(2);
+            document.getElementById('response').innerHTML = 'Transfer: ' + percentComplete + '% complete';
+          }
+        }
+
+        function transferFailed(evt) {
+          console.log("An error occurred while transferring the file.");
+        }
+
+        function transferCanceled(evt) {
+          console.log("The transfer has been canceled by the user.");
+        }
+
         function readFile(fileInputEvent) {
           //Retrieve the first (and only!) File from the FileList object
           var inputFile = fileInputEvent.target.files[0];
           var postToServer = new XMLHttpRequest();
           postToServer.open('POST', '/' + inputFile.name, true);
+          postToServer.upload.addEventListener("progress", updateProgress);
+          postToServer.upload.addEventListener("error", transferFailed);
+          postToServer.upload.addEventListener("abort", transferCanceled);
           postToServer.onreadystatechange = function() {
             if (postToServer.readyState==4 && postToServer.status==200){
               document.getElementById('response').innerHTML = 'Success: '+ postToServer.responseText;
