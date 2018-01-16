@@ -33,19 +33,26 @@ fn from(header_map: &HeaderMap) -> Headers {
 }
 
 impl FromData for RocketFormData {
-    type Error = ();
+    type Error = String;
 
     fn from_data(request: &Request, data: Data) -> data::Outcome<Self, Self::Error> {
         let headers = from(request.headers());
+
         match formdata::read_formdata(&mut data.open(), &headers) {
             Ok(parsed_form) => return Outcome::Success(RocketFormData(parsed_form)),
-            _ => return Outcome::Failure((Status::BadRequest, ()))
+            _ => return Outcome::Failure((Status::BadRequest, String::from("Failed to read formdata")))
         };
     }
 }
 
+#[post("/<filename>", data = "<data>")]
+fn upload_binary(filename: String, data: Data) -> io::Result<String> {
+    data.stream_to_file(format!("{}/{}", UPLOAD_DIR, filename))
+        .map(|numbytes| format!("Uploaded {} bytes as {}", numbytes.to_string(), filename))
+}
+
 #[post("/", format = "multipart/form-data", data = "<upload>")]
-fn upload(upload: RocketFormData) -> io::Result<String> {
+fn upload_form(upload: RocketFormData) -> io::Result<String> {
   for (name, value) in upload.0.fields {
     println!("Posted field name={} value={}", name, value);
   }
@@ -70,12 +77,41 @@ fn upload(upload: RocketFormData) -> io::Result<String> {
 fn index() -> content::Html<&'static str> {
   content::Html(r#"
     <!doctype html>
-    <title>Upload a file</title>
-    <h1>Upload a file</h1>
-    <form action="" method=post enctype=multipart/form-data>
-      <p><input type=file name=file>
-         <input type=submit value=Upload>
-    </form>
+      <title>Upload a file</title>
+      <h1>Select a file to upload</h1>
+      <form action="" method="post" enctype="multipart/form-data">
+        <p>
+          <input id="fileinput" name="file" type="file" />
+          <input id="upload" type="submit" value="Upload" />
+        </p>
+        <div id="response"></div>
+      </form>
+      <script>
+      // Check for the various File API support.
+      if (window.File && window.FileList) {
+        // Disable upload button.
+        document.getElementById('upload').style.display='none';
+ 
+        function readFile(fileInputEvent) {
+          //Retrieve the first (and only!) File from the FileList object
+          var inputFile = fileInputEvent.target.files[0];
+          var postToServer = new XMLHttpRequest();
+          postToServer.open('POST', '/' + inputFile.name, true);
+          postToServer.onreadystatechange = function() {
+            if (postToServer.readyState==4 && postToServer.status==200){
+              document.getElementById('response').innerHTML = 'Success: '+ postToServer.responseText;
+            } else {
+              document.getElementById('response').innerHTML = 'Failure: HTTP Error '
+                + postToServer.status + ' ' + postToServer.responseText;
+            }
+            fileInputEvent.target.value = "";
+          }
+          postToServer.send(inputFile);
+        }
+
+        document.getElementById('fileinput').addEventListener('change', readFile, false);
+      }
+      </script>
     </html>
   "#)
 }
@@ -97,9 +133,9 @@ fn main() {
             process::exit(1);
         },
         Ok(_) => {
-            let cache: Cache = Cache::new(1024 * 1024 * 40); // 40 MB
+            let cache: Cache = Cache::new(1024 * 1024 * 128); // 128 MB
             rocket::ignite().manage(cache)
-                .mount("/", routes![files, index, upload]).launch();
+                .mount("/", routes![files, index, upload_binary, upload_form]).launch();
         }
     }
 }
