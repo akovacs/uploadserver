@@ -1,6 +1,7 @@
 #![feature(plugin)]
 #![plugin(rocket_codegen)]
 
+extern crate chrono;
 extern crate formdata;
 extern crate rocket;
 extern crate rocket_file_cache;
@@ -10,12 +11,13 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
+use chrono::{DateTime, Utc};
 use formdata::FormData;
 use rocket::{Data, Outcome, Request, State};
 use rocket::data::{self, FromData};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::{Headers};
-use rocket::response::content;
+use rocket::response::{content, Content};
 use rocket_file_cache::{Cache, CachedFile};
 
 const UPLOAD_DIR: &'static str = "uploads/";
@@ -86,6 +88,7 @@ fn index() -> content::Html<&'static str> {
         </p>
         <div id="response"></div>
       </form>
+      <iframe src="list/" frameborder="0" style="overflow:hidden;height:100%;width:100%" height="100%" width="100%"></iframe>
       <script>
       // Check for the various File API support.
       if (window.File && window.FileList) {
@@ -144,6 +147,37 @@ fn create_upload_directory() -> io::Result<bool> {
     return Ok(true);
 }
 
+#[get("/list")]
+fn list() -> content::Html<String> {
+    if let Ok(entries) = fs::read_dir(UPLOAD_DIR) {
+        let mut table = vec![String::from(r#"
+        <table border="1">
+          <tr>
+            <th>File Name</th>
+            <th>Modified</th>
+          </tr>"#)];
+        for entry in entries {
+            if let Ok(entry) = entry {
+                // Here, `entry` is a `DirEntry`.
+                if let Ok(metadata) = entry.metadata() {
+                    let modified_time = match metadata.modified() {
+                        Ok(system_time) => {
+                          let datetime: DateTime<Utc> = system_time.into();
+                          datetime.to_rfc2822()
+                        },
+                        _ => String::from("Unknown Modification Time")
+                    };
+                    table.push(format!("<tr><td>{}</td><td>{}</td>", entry.path().to_str().unwrap(), modified_time));
+                }
+            }
+        }
+        table.push("</table>".to_string());
+        return content::Html(table.join("\n"));
+    }
+    return content::Html(String::from("Error listing directory"));
+}
+
+
 fn main() {
     match create_upload_directory() {
         Err(error) => {
@@ -153,7 +187,7 @@ fn main() {
         Ok(_) => {
             let cache: Cache = Cache::new(1024 * 1024 * 128); // 128 MB
             rocket::ignite().manage(cache)
-                .mount("/", routes![files, index, upload_binary, upload_form]).launch();
+                .mount("/", routes![files, index, list, upload_binary, upload_form]).launch();
         }
     }
 }

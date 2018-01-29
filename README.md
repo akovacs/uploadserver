@@ -17,3 +17,5 @@ A simple server for which you can upload and download files from.
 3. Compile and execute the server
 
     cargo run --release
+
+4. Browse to http://localhost:8000 to upload files
