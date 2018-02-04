@@ -20,7 +20,7 @@ use rocket::http::hyper::header::{Headers};
 use rocket::response::{content, Content};
 use rocket_file_cache::{Cache, CachedFile};
 
-const UPLOAD_DIR: &'static str = "uploads/";
+const UPLOADS_DIR: &'static str = "uploads/";
 
 // Wrap formdata::FormData in order to implement FromData trait
 struct RocketFormData(FormData);
@@ -49,7 +49,7 @@ impl FromData for RocketFormData {
 
 #[post("/<filename>", data = "<data>")]
 fn upload_binary(filename: String, data: Data) -> io::Result<String> {
-    data.stream_to_file(format!("{}/{}", UPLOAD_DIR, filename))
+    data.stream_to_file(format!("{}/{}", UPLOADS_DIR, filename))
         .map(|numbytes| format!("Uploaded {} bytes as {}", numbytes.to_string(), filename))
 }
 
@@ -65,11 +65,11 @@ fn upload_form(upload: RocketFormData) -> io::Result<String> {
       _ => time::now().to_timespec().sec.to_string()
     };
     println!("Posted file fieldname={} name={} path={:?}", name, filename, file.path);
-    let upload_location = Path::new(UPLOAD_DIR).join(&filename);
+    let upload_location = Path::new(UPLOADS_DIR).join(&filename);
     match fs::copy(&file.path, &upload_location) {
       Ok(_) => return Ok(format!("Uploaded {}", filename)),
       Err(error) => return Err(io::Error::new(io::ErrorKind::Other,
-                        format!("Cannot write to {} directory due to {:?}", UPLOAD_DIR, error)))
+                        format!("Cannot write to {} directory due to {:?}", UPLOADS_DIR, error)))
     };
   }
   return Err(io::Error::new(io::ErrorKind::InvalidInput, "No files uploaded"));
@@ -137,19 +137,19 @@ fn index() -> content::Html<&'static str> {
   "#)
 }
 
-#[get("/<file..>")]
+#[get("/uploads/<file..>")]
 fn files(file: PathBuf, cache: State<Cache>) -> CachedFile {
-    CachedFile::open(Path::new(UPLOAD_DIR).join(file), cache.inner())
+    CachedFile::open(Path::new(UPLOADS_DIR).join(file), cache.inner())
 }
 
 fn create_upload_directory() -> io::Result<bool> {
-    fs::create_dir_all(UPLOAD_DIR)?;
+    fs::create_dir_all(UPLOADS_DIR)?;
     return Ok(true);
 }
 
 #[get("/list")]
 fn list() -> content::Html<String> {
-    if let Ok(entries) = fs::read_dir(UPLOAD_DIR) {
+    if let Ok(entries) = fs::read_dir(UPLOADS_DIR) {
         let mut table = vec![String::from(r#"
         <table border="1">
           <tr>
@@ -167,7 +167,11 @@ fn list() -> content::Html<String> {
                         },
                         _ => String::from("Unknown Modification Time")
                     };
-                    table.push(format!("<tr><td>{}</td><td>{}</td>", entry.path().to_str().unwrap(), modified_time));
+                    let file_name = &entry.file_name();
+                    let file_name_string = file_name.to_string_lossy();
+                    let path = &entry.path();
+                    let path_string = path.display();
+                    table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td>", path_string, file_name_string, modified_time));
                 }
             }
         }
@@ -181,7 +185,7 @@ fn list() -> content::Html<String> {
 fn main() {
     match create_upload_directory() {
         Err(error) => {
-            eprintln!("Could not create ./{} directory: {}", UPLOAD_DIR, error);
+            eprintln!("Could not create ./{} directory: {}", UPLOADS_DIR, error);
             process::exit(1);
         },
         Ok(_) => {
