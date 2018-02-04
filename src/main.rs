@@ -2,6 +2,8 @@
 #![plugin(rocket_codegen)]
 
 extern crate chrono;
+#[macro_use]
+extern crate clap;
 extern crate formdata;
 extern crate mime_guess;
 extern crate pretty_bytes;
@@ -14,6 +16,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 use chrono::{DateTime, Utc};
+use clap::App;
 use formdata::FormData;
 use pretty_bytes::converter::convert;
 use rocket::{Data, Outcome, Request, State};
@@ -21,7 +24,7 @@ use rocket::data::{self, FromData};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::{Headers};
 use rocket::response::{content, Content};
-use rocket_file_cache::{Cache, CachedFile};
+use rocket_file_cache::{Cache, CacheBuilder, CachedFile};
 
 const UPLOADS_DIR: &'static str = "uploads/";
 
@@ -211,13 +214,22 @@ fn list() -> content::Html<String> {
 
 
 fn main() {
+    let matches = App::new("Fileserver")
+        .version("0.1.0")
+        .about("Simple standalone webserver which you can upload and download files from")
+        .args_from_usage(
+            "--filecache_size <CACHE_SIZE> 'In-memory cache of frequently-accessed files in MB (default is 128 MB)'")
+        .get_matches();
+    let filecache_size = value_t!(matches, "filecache_size", usize).unwrap_or(128);
+    println!("Using {} MB file cache", filecache_size);
+
     match create_upload_directory() {
         Err(error) => {
             eprintln!("Could not create ./{} directory: {}", UPLOADS_DIR, error);
             process::exit(1);
         },
         Ok(_) => {
-            let cache: Cache = Cache::new(1024 * 1024 * 128); // 128 MB
+            let cache: Cache = CacheBuilder::new().size_limit(1024 * 1024 * filecache_size).build().unwrap();
             rocket::ignite().manage(cache)
                 .mount("/", routes![files, index, list, upload_binary, upload_form]).launch();
         }

@@ -1,21 +1,26 @@
-A simple server for which you can upload and download files from.
+A simple standalone webserver for which you can upload and download files from.
 
 # Setup
-1. Install rust toolchain manager
+1. Install rust toolchain manager:
 
-    # Arch Linux
-    sudo pacman -S rustup
+        # Arch Linux
+        sudo pacman -S rustup
 
-    # Other distributions
-    curl https://sh.rustup.rs -sSf | sh
+        # Other distributions
+        curl https://sh.rustup.rs -sSf | sh
 
-2. Download rust nightly compiler
+2. Download rust nightly compiler:
 
-    rustup install nightly
-    rustup default nightly
+        rustup install nightly
+        rustup default nightly
 
-3. Compile and execute the server
+3. Compile and execute the server:
 
-    cargo run --release
+        cargo run --release
 
-4. Browse to http://localhost:8000 to upload files
+4. Browse to http://localhost:8000 to upload and download files.
+
+# Advanced
+* Specify size of in-memory cache (in MB) for serving frequently-accessed files:
+
+        cargo run --release -- --filecache_size=1024

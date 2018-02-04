@@ -5,10 +5,11 @@ authors = ["Arpad Kovacs <minhmeoke@gmail.com>"]
 
 [dependencies]
 chrono = "0.4.0"
+clap = "2.29.2"
 formdata = "0.12.2"
 mime_guess = "1.8.3"
 pretty-bytes = "0.2.2"
 rocket = "0.3.6"
 rocket_codegen = "0.3.6"
-rocket-file-cache = "0.12.0"
+rocket-file-cache = "1.0.0-beta"
 time = "0.1.39"
