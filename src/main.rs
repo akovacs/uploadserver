@@ -82,16 +82,38 @@ fn upload_form(upload: RocketFormData) -> io::Result<String> {
 fn index() -> content::Html<&'static str> {
   content::Html(r#"
     <!doctype html>
-      <title>Upload a file</title>
-      <h1>Select a file to upload</h1>
-      <form action="" method="post" enctype="multipart/form-data">
-        <p>
-          <input id="fileinput" name="file" type="file" />
-          <input id="upload" type="submit" value="Upload" />
-        </p>
-        <div id="response"></div>
-      </form>
-      <iframe src="list/" frameborder="0" style="overflow:hidden;height:100%;width:100%" height="100%" width="100%"></iframe>
+      <head>
+        <title>Upload a file</title>
+        <style>
+          body, html {
+            width: 100%; height: 100%; margin: 0; padding: 0;
+          }
+          .first-row {
+            position: absolute; top: 0; left: 0; left: 0; right: 0;
+            height: 8em; margin: 10px;
+          }
+          .second-row {
+            position: absolute; top: 8em; left: 0; right: 0; bottom: 0;
+          }
+          .second-row iframe {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border: none; margin: 0; padding: 0;
+          }
+        </style>
+      </head>
+      <div class="first-row">
+        <h1>Select a file to upload</h1>
+        <form action="" method="post" enctype="multipart/form-data">
+          <p>
+            <input id="fileinput" name="file" type="file" />
+            <input id="upload" type="submit" value="Upload" />
+            <span id="response"></span>
+          </p>
+        </form>
+      </div>
+      <div class="second-row">
+        <iframe src="list/" frameborder="0"></iframe>
+      </div>
       <script>
       // Check for the various File API support.
       if (window.File && window.FileList) {
