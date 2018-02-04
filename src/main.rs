@@ -3,6 +3,7 @@
 
 extern crate chrono;
 extern crate formdata;
+extern crate mime_guess;
 extern crate rocket;
 extern crate rocket_file_cache;
 extern crate time;
@@ -154,6 +155,7 @@ fn list() -> content::Html<String> {
         <table border="1">
           <tr>
             <th>File Name</th>
+            <th>Type</th>
             <th>Modified</th>
           </tr>"#)];
         for entry in entries {
@@ -170,8 +172,9 @@ fn list() -> content::Html<String> {
                     let file_name = &entry.file_name();
                     let file_name_string = file_name.to_string_lossy();
                     let path = &entry.path();
+                    let mime_type = mime_guess::guess_mime_type(&path).to_string();
                     let path_string = path.display();
-                    table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td>", path_string, file_name_string, modified_time));
+                    table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td><td>{}</td>", path_string, file_name_string, mime_type, modified_time));
                 }
             }
         }
