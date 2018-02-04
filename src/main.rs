@@ -4,6 +4,7 @@
 extern crate chrono;
 extern crate formdata;
 extern crate mime_guess;
+extern crate pretty_bytes;
 extern crate rocket;
 extern crate rocket_file_cache;
 extern crate time;
@@ -14,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use chrono::{DateTime, Utc};
 use formdata::FormData;
+use pretty_bytes::converter::convert;
 use rocket::{Data, Outcome, Request, State};
 use rocket::data::{self, FromData};
 use rocket::http::{HeaderMap, Status};
@@ -156,6 +158,7 @@ fn list() -> content::Html<String> {
           <tr>
             <th>File Name</th>
             <th>Type</th>
+            <th>Size</th>
             <th>Modified</th>
           </tr>"#)];
         for entry in entries {
@@ -173,8 +176,9 @@ fn list() -> content::Html<String> {
                     let file_name_string = file_name.to_string_lossy();
                     let path = &entry.path();
                     let mime_type = mime_guess::guess_mime_type(&path).to_string();
+                    let file_size = convert(metadata.len() as f64);
                     let path_string = path.display();
-                    table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td><td>{}</td>", path_string, file_name_string, mime_type, modified_time));
+                    table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td><td align='right'>{}</td><td>{}</td>", path_string, file_name_string, mime_type, file_size, modified_time));
                 }
             }
         }

@@ -7,6 +7,7 @@ authors = ["Arpad Kovacs <minhmeoke@gmail.com>"]
 chrono = "0.4.0"
 formdata = "0.12.2"
 mime_guess = "1.8.3"
+pretty-bytes = "0.2.2"
 rocket = "0.3.6"
 rocket_codegen = "0.3.6"
 rocket-file-cache = "0.12.0"
