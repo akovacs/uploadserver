@@ -183,25 +183,24 @@ fn list() -> content::Html<String> {
             <th>Size</th>
             <th>Modified</th>
           </tr>"#)];
-        for entry in entries {
-            if let Ok(entry) = entry {
-                // Here, `entry` is a `DirEntry`.
-                if let Ok(metadata) = entry.metadata() {
-                    let modified_time = match metadata.modified() {
-                        Ok(system_time) => {
-                          let datetime: DateTime<Utc> = system_time.into();
-                          datetime.to_rfc2822()
-                        },
-                        _ => String::from("Unknown Modification Time")
-                    };
-                    let file_name = &entry.file_name();
-                    let file_name_string = file_name.to_string_lossy();
-                    let path = &entry.path();
-                    let mime_type = mime_guess::guess_mime_type(&path).to_string();
-                    let file_size = convert(metadata.len() as f64);
-                    let path_string = path.display();
-                    table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td><td align='right'>{}</td><td>{}</td>", path_string, file_name_string, mime_type, file_size, modified_time));
-                }
+        let mut files: Vec<_> = entries.filter_map(|entry| entry.ok()).collect();
+        files.sort_by_key(|file| file.path());
+        for file in files {
+            if let Ok(metadata) = file.metadata() {
+                let modified_time = match metadata.modified() {
+                    Ok(system_time) => {
+                      let datetime: DateTime<Utc> = system_time.into();
+                      datetime.to_rfc2822()
+                    },
+                    _ => String::from("Unknown Modification Time")
+                };
+                let file_name = &file.file_name();
+                let file_name_string = file_name.to_string_lossy();
+                let path = &file.path();
+                let mime_type = mime_guess::guess_mime_type(&path).to_string();
+                let file_size = convert(metadata.len() as f64);
+                let path_string = path.display();
+                table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td><td align='right'>{}</td><td>{}</td>", path_string, file_name_string, mime_type, file_size, modified_time));
             }
         }
         table.push("</table>".to_string());
