@@ -6,6 +6,7 @@ authors = ["Arpad Kovacs <minhmeoke@gmail.com>"]
 [dependencies]
 chrono = "0.4.0"
 clap = "2.29.2"
+rust-crypto = "0.2.36"
 formdata = "0.12.2"
 mime_guess = "1.8.3"
 pretty-bytes = "0.2.2"

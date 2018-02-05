@@ -4,6 +4,7 @@
 extern crate chrono;
 #[macro_use]
 extern crate clap;
+extern crate crypto;
 extern crate formdata;
 extern crate mime_guess;
 extern crate pretty_bytes;
@@ -11,12 +12,17 @@ extern crate rocket;
 extern crate rocket_file_cache;
 extern crate time;
 
+use std::borrow::Cow;
 use std::fs;
 use std::io;
+use std::io::prelude::*;
+use std::io::{Read, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::process;
 use chrono::{DateTime, Utc};
-use clap::App;
+use clap::{App, Arg};
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
 use formdata::FormData;
 use pretty_bytes::converter::convert;
 use rocket::{Data, Outcome, Request, State};
@@ -27,6 +33,7 @@ use rocket::response::{content, Content};
 use rocket_file_cache::{Cache, CacheBuilder, CachedFile};
 
 const UPLOADS_DIR: &'static str = "uploads/";
+const SHA256_EXTENSION: &'static str = "sha256";
 
 // Wrap formdata::FormData in order to implement FromData trait
 struct RocketFormData(FormData);
@@ -213,12 +220,34 @@ fn list() -> content::Html<String> {
 }
 
 
+fn compute_sha256(path: &PathBuf) -> io::Result<String> {
+    let mut sha256_hasher = Sha256::new();
+    let mut buffer = [0; 4096];
+    let mut file = fs::File::open(&path)?;
+    loop {
+        let len = match file.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(len) => len,
+            Err(ref err) if err.kind() == ErrorKind::Interrupted => continue,
+            Err(err) => return Err(err),
+        };
+        sha256_hasher.input(&buffer[..len]);
+    }
+    return Ok(sha256_hasher.result_str());
+}
+
 fn main() {
     let matches = App::new("Fileserver")
         .version("0.1.0")
         .about("Simple standalone webserver which you can upload and download files from")
-        .args_from_usage(
-            "--filecache_size <CACHE_SIZE> 'In-memory cache of frequently-accessed files in MB (default is 128 MB)'")
+        .arg(Arg::with_name("filecache_size")
+             .help("In-memory cache of frequently-accessed files in MB (default is 128 MB)")
+             .long("filecache_size")
+             .takes_value(true)
+             .value_name("CACHE_SIZE"))
+        .arg(Arg::with_name("generate_sha256")
+             .long("generate_sha256")
+             .help("Generate SHA256 hashes for each uploaded file"))
         .get_matches();
     let filecache_size = value_t!(matches, "filecache_size", usize).unwrap_or(128);
     println!("Using {} MB file cache", filecache_size);
@@ -229,6 +258,39 @@ fn main() {
             process::exit(1);
         },
         Ok(_) => {
+            if matches.is_present("generate_sha256") {
+                if let Ok(entries) = fs::read_dir(UPLOADS_DIR) {
+                    let mut paths_to_hash: Vec<_> = entries.filter_map(|entry| entry.ok())
+                        .map(|valid_entry| valid_entry.path())
+                        .filter(|path| !path.is_dir())
+                        .filter(|path| {
+                            match path.extension() {
+                                Some(extension) => extension != SHA256_EXTENSION,
+                                None => true
+                            }
+                        })
+                        .collect();
+                    for mut pathbuf in paths_to_hash {
+                       let sha256_hash = match compute_sha256(&pathbuf) {
+                           Ok(hash) => hash,
+                           Err(_) => continue
+                       };
+                       println!("SHA256 of {} is {}", pathbuf.display(), sha256_hash);
+                       let new_extension = match pathbuf.extension() {
+                           Some(extension) => [extension.to_string_lossy(), Cow::Borrowed(SHA256_EXTENSION)].join("."),
+                           None => String::from(SHA256_EXTENSION)
+                       };
+                       pathbuf.set_extension(new_extension);
+                       let path = pathbuf.as_path();
+                       let mut sha256_file = match fs::File::create(path) {
+                           Ok(file) => file,
+                           Err(_) => continue
+                       };
+                       sha256_file.write_all(sha256_hash.as_bytes());
+                       sha256_file.sync_all();
+                    }
+                }
+            }
             let cache: Cache = CacheBuilder::new().size_limit(1024 * 1024 * filecache_size).build().unwrap();
             rocket::ignite().manage(cache)
                 .mount("/", routes![files, index, list, upload_binary, upload_form]).launch();

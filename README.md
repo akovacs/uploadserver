@@ -24,3 +24,7 @@ A simple standalone webserver for which you can upload and download files from.
 * Specify size of in-memory cache (in MB) for serving frequently-accessed files:
 
         cargo run --release -- --filecache_size=1024
+
+* Generate SHA256 hashes for each file in uploads
+
+        cargo run --release -- --generate_sha256
