@@ -242,32 +242,40 @@ fn compute_sha256(path: &PathBuf) -> io::Result<String> {
     return Ok(sha256_hasher.result_str());
 }
 
-fn write_sha256(pathbuf: &mut PathBuf) {
+
+fn write_sha256(pathbuf: &mut PathBuf) -> io::Result<bool> {
     let new_extension = match pathbuf.extension() {
         Some(extension) => {
             if extension == SHA256_EXTENSION {
                 println!("Skipping SHA256 computation of {}", pathbuf.display());
-                return;
+                return Ok(false);
             } else {
                 [extension.to_string_lossy(), Cow::Borrowed(SHA256_EXTENSION)].join(".")
             }
         },
         None => String::from(SHA256_EXTENSION)
     };
-    let sha256_hash = match compute_sha256(&pathbuf) {
-        Ok(hash) => hash,
-        Err(_) => return
-    };
+    let sha256_hash = compute_sha256(&pathbuf)?;
     println!("SHA256 of {} is {}", pathbuf.display(), sha256_hash);
     pathbuf.set_extension(new_extension);
     let path = pathbuf.as_path();
-    let mut sha256_file = match fs::File::create(path) {
-        Ok(file) => file,
-        Err(_) => return
-    };
-    sha256_file.write_all(sha256_hash.as_bytes());
-    sha256_file.sync_all();
+    let mut sha256_file = fs::File::create(path)?;
+    sha256_file.write_all(sha256_hash.as_bytes())?;
+    sha256_file.sync_all()?;
+    return Ok(true);
 }
+
+
+fn write_sha256_ignoring_errors(pathbuf: &mut PathBuf) {
+    match write_sha256(pathbuf) {
+        Err(error) => {
+            println!("Encountered error while writing {}: {}", pathbuf.display(), error);
+            return;
+        }
+        _ => return
+    }
+}
+
 
 fn main() {
     let matches = App::new("Fileserver")
@@ -304,7 +312,7 @@ fn main() {
                         })
                         .collect();
                     for mut pathbuf in paths_to_hash {
-                        write_sha256(&mut pathbuf);
+                        write_sha256_ignoring_errors(&mut pathbuf);
                     }
                 }
                 thread::spawn(|| {
@@ -322,12 +330,15 @@ fn main() {
                             Ok(event) => {
                                 println!("{:?}", event);
                                 match event {
-                                    DebouncedEvent::Create(mut created_path) => write_sha256(&mut created_path),
-                                    DebouncedEvent::Write(mut modified_path) => write_sha256(&mut modified_path),
-                                    DebouncedEvent::Rename(_, mut after_path) => write_sha256(&mut after_path),
+                                    DebouncedEvent::Create(mut created_path) =>
+                                        write_sha256_ignoring_errors(&mut created_path),
+                                    DebouncedEvent::Write(mut modified_path) =>
+                                        write_sha256_ignoring_errors(&mut modified_path),
+                                    DebouncedEvent::Rename(_, mut after_path) =>
+                                        write_sha256_ignoring_errors(&mut after_path),
                                     _ => continue
 
-                                }
+                                };
                             },
                             Err(e) => println!("watch error: {:?}", e),
                         }
