@@ -20,6 +20,8 @@ A simple standalone webserver for which you can upload and download files from.
 
 4. Browse to http://localhost:8000 to upload and download files.
 
+    ![Upload server web interface](/doc/uploadserver.png)
+
 # Advanced
 * Specify size of in-memory cache (in MB) for serving frequently-accessed files:
 
