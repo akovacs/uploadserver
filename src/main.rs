@@ -7,6 +7,7 @@ extern crate clap;
 extern crate crypto;
 extern crate formdata;
 extern crate mime_guess;
+extern crate notify;
 extern crate pretty_bytes;
 extern crate rocket;
 extern crate rocket_file_cache;
@@ -19,11 +20,16 @@ use std::io::prelude::*;
 use std::io::{Read, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::mpsc::channel;
+use std::thread;
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
 use clap::{App, Arg};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use formdata::FormData;
+use notify::{Watcher, RecursiveMode, watcher, DebouncedEvent};
 use pretty_bytes::converter::convert;
 use rocket::{Data, Outcome, Request, State};
 use rocket::data::{self, FromData};
@@ -236,6 +242,33 @@ fn compute_sha256(path: &PathBuf) -> io::Result<String> {
     return Ok(sha256_hasher.result_str());
 }
 
+fn write_sha256(pathbuf: &mut PathBuf) {
+    let new_extension = match pathbuf.extension() {
+        Some(extension) => {
+            if extension == SHA256_EXTENSION {
+                println!("Skipping SHA256 computation of {}", pathbuf.display());
+                return;
+            } else {
+                [extension.to_string_lossy(), Cow::Borrowed(SHA256_EXTENSION)].join(".")
+            }
+        },
+        None => String::from(SHA256_EXTENSION)
+    };
+    let sha256_hash = match compute_sha256(&pathbuf) {
+        Ok(hash) => hash,
+        Err(_) => return
+    };
+    println!("SHA256 of {} is {}", pathbuf.display(), sha256_hash);
+    pathbuf.set_extension(new_extension);
+    let path = pathbuf.as_path();
+    let mut sha256_file = match fs::File::create(path) {
+        Ok(file) => file,
+        Err(_) => return
+    };
+    sha256_file.write_all(sha256_hash.as_bytes());
+    sha256_file.sync_all();
+}
+
 fn main() {
     let matches = App::new("Fileserver")
         .version("0.1.0")
@@ -271,25 +304,35 @@ fn main() {
                         })
                         .collect();
                     for mut pathbuf in paths_to_hash {
-                       let sha256_hash = match compute_sha256(&pathbuf) {
-                           Ok(hash) => hash,
-                           Err(_) => continue
-                       };
-                       println!("SHA256 of {} is {}", pathbuf.display(), sha256_hash);
-                       let new_extension = match pathbuf.extension() {
-                           Some(extension) => [extension.to_string_lossy(), Cow::Borrowed(SHA256_EXTENSION)].join("."),
-                           None => String::from(SHA256_EXTENSION)
-                       };
-                       pathbuf.set_extension(new_extension);
-                       let path = pathbuf.as_path();
-                       let mut sha256_file = match fs::File::create(path) {
-                           Ok(file) => file,
-                           Err(_) => continue
-                       };
-                       sha256_file.write_all(sha256_hash.as_bytes());
-                       sha256_file.sync_all();
+                        write_sha256(&mut pathbuf);
                     }
                 }
+                thread::spawn(|| {
+                    // Create a channel to receive the events.
+                    let (tx, rx) = channel();
+
+                    // Automatically select the best implementation for your platform.
+                    let mut watcher = watcher(tx, Duration::from_secs(10)).unwrap();
+
+                    // Add a path to be watched. All files and directories at that path and
+                    // below will be monitored for changes.
+                    watcher.watch(UPLOADS_DIR, RecursiveMode::Recursive).unwrap();
+                    loop {
+                        match rx.recv() {
+                            Ok(event) => {
+                                println!("{:?}", event);
+                                match event {
+                                    DebouncedEvent::Create(mut created_path) => write_sha256(&mut created_path),
+                                    DebouncedEvent::Write(mut modified_path) => write_sha256(&mut modified_path),
+                                    DebouncedEvent::Rename(_, mut after_path) => write_sha256(&mut after_path),
+                                    _ => continue
+
+                                }
+                            },
+                            Err(e) => println!("watch error: {:?}", e),
+                        }
+                    }
+                });
             }
             let cache: Cache = CacheBuilder::new().size_limit(1024 * 1024 * filecache_size).build().unwrap();
             rocket::ignite().manage(cache)
