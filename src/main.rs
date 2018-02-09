@@ -34,8 +34,8 @@ use pretty_bytes::converter::convert;
 use rocket::{Data, Outcome, Request, State};
 use rocket::data::{self, FromData};
 use rocket::http::{HeaderMap, Status};
-use rocket::http::hyper::header::{Headers};
-use rocket::response::{content, Content};
+use rocket::http::hyper::header::Headers;
+use rocket::response::content;
 use rocket_file_cache::{Cache, CacheBuilder, CachedFile};
 
 const UPLOADS_DIR: &'static str = "uploads/";
@@ -61,7 +61,10 @@ impl FromData for RocketFormData {
 
         match formdata::read_formdata(&mut data.open(), &headers) {
             Ok(parsed_form) => return Outcome::Success(RocketFormData(parsed_form)),
-            _ => return Outcome::Failure((Status::BadRequest, String::from("Failed to read formdata")))
+            _ => {
+                return Outcome::Failure((Status::BadRequest,
+                                         String::from("Failed to read formdata")))
+            }
         };
     }
 }
@@ -74,29 +77,36 @@ fn upload_binary(filename: String, data: Data) -> io::Result<String> {
 
 #[post("/", format = "multipart/form-data", data = "<upload>")]
 fn upload_form(upload: RocketFormData) -> io::Result<String> {
-  for (name, value) in upload.0.fields {
-    println!("Posted field name={} value={}", name, value);
-  }
-  for (name, mut file) in upload.0.files {
-    //file.do_not_delete_on_drop(); // don't delete temporary file
-    let filename = match file.filename() {
-      Ok(Some(original_filename)) => original_filename,
-      _ => time::now().to_timespec().sec.to_string()
-    };
-    println!("Posted file fieldname={} name={} path={:?}", name, filename, file.path);
-    let upload_location = Path::new(UPLOADS_DIR).join(&filename);
-    match fs::copy(&file.path, &upload_location) {
-      Ok(_) => return Ok(format!("Uploaded {}", filename)),
-      Err(error) => return Err(io::Error::new(io::ErrorKind::Other,
-                        format!("Cannot write to {} directory due to {:?}", UPLOADS_DIR, error)))
-    };
-  }
-  return Err(io::Error::new(io::ErrorKind::InvalidInput, "No files uploaded"));
+    for (name, value) in upload.0.fields {
+        println!("Posted field name={} value={}", name, value);
+    }
+    for (name, mut file) in upload.0.files {
+        // file.do_not_delete_on_drop(); // don't delete temporary file
+        let filename = match file.filename() {
+            Ok(Some(original_filename)) => original_filename,
+            _ => time::now().to_timespec().sec.to_string(),
+        };
+        println!("Posted file fieldname={} name={} path={:?}",
+                 name,
+                 filename,
+                 file.path);
+        let upload_location = Path::new(UPLOADS_DIR).join(&filename);
+        match fs::copy(&file.path, &upload_location) {
+            Ok(_) => return Ok(format!("Uploaded {}", filename)),
+            Err(error) => {
+                return Err(io::Error::new(io::ErrorKind::Other,
+                                          format!("Cannot write to {} directory due to {:?}",
+                                                  UPLOADS_DIR,
+                                                  error)))
+            }
+        };
+    }
+    return Err(io::Error::new(io::ErrorKind::InvalidInput, "No files uploaded"));
 }
 
 #[get("/")]
 fn index() -> content::Html<&'static str> {
-  content::Html(r#"
+    content::Html(r#"
     <!doctype html>
       <head>
         <title>Upload a file</title>
@@ -139,7 +149,8 @@ fn index() -> content::Html<&'static str> {
         function updateProgress (transferEvent) {
           if (transferEvent.lengthComputable) {
             var percentComplete = (transferEvent.loaded / transferEvent.total * 100).toFixed(2);
-            document.getElementById('response').innerHTML = 'Transfer: ' + percentComplete + '% complete';
+            document.getElementById('response').innerHTML =
+              'Transfer: ' + percentComplete + '% complete';
           }
         }
 
@@ -161,7 +172,8 @@ fn index() -> content::Html<&'static str> {
           postToServer.upload.addEventListener("abort", transferCanceled);
           postToServer.onreadystatechange = function() {
             if (postToServer.readyState==4 && postToServer.status==200){
-              document.getElementById('response').innerHTML = 'Success: '+ postToServer.responseText;
+              document.getElementById('response').innerHTML =
+                'Success: '+ postToServer.responseText;
             } else {
               document.getElementById('response').innerHTML = 'Failure: HTTP Error '
                 + postToServer.status + ' ' + postToServer.responseText;
@@ -205,10 +217,10 @@ fn list() -> content::Html<String> {
             if let Ok(metadata) = file.metadata() {
                 let modified_time = match metadata.modified() {
                     Ok(system_time) => {
-                      let datetime: DateTime<Utc> = system_time.into();
-                      datetime.to_rfc2822()
-                    },
-                    _ => String::from("Unknown Modification Time")
+                        let datetime: DateTime<Utc> = system_time.into();
+                        datetime.to_rfc2822()
+                    }
+                    _ => String::from("Unknown Modification Time"),
                 };
                 let file_name = &file.file_name();
                 let file_name_string = file_name.to_string_lossy();
@@ -216,7 +228,13 @@ fn list() -> content::Html<String> {
                 let mime_type = mime_guess::guess_mime_type(&path).to_string();
                 let file_size = convert(metadata.len() as f64);
                 let path_string = path.display();
-                table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td><td align='right'>{}</td><td>{}</td>", path_string, file_name_string, mime_type, file_size, modified_time));
+                table.push(format!("<tr><td><a href=\"/{}\">{}</a></td><td>{}</td><td \
+                                    align='right'>{}</td><td>{}</td>",
+                                   path_string,
+                                   file_name_string,
+                                   mime_type,
+                                   file_size,
+                                   modified_time));
             }
         }
         table.push("</table>".to_string());
@@ -252,8 +270,8 @@ fn write_sha256(pathbuf: &mut PathBuf) -> io::Result<bool> {
             } else {
                 [extension.to_string_lossy(), Cow::Borrowed(SHA256_EXTENSION)].join(".")
             }
-        },
-        None => String::from(SHA256_EXTENSION)
+        }
+        None => String::from(SHA256_EXTENSION),
     };
     let sha256_hash = compute_sha256(&pathbuf)?;
     println!("SHA256 of {} is {}", pathbuf.display(), sha256_hash);
@@ -269,10 +287,12 @@ fn write_sha256(pathbuf: &mut PathBuf) -> io::Result<bool> {
 fn write_sha256_ignoring_errors(pathbuf: &mut PathBuf) {
     match write_sha256(pathbuf) {
         Err(error) => {
-            println!("Encountered error while writing {}: {}", pathbuf.display(), error);
+            println!("Encountered error while writing {}: {}",
+                     pathbuf.display(),
+                     error);
             return;
         }
-        _ => return
+        _ => return,
     }
 }
 
@@ -282,13 +302,13 @@ fn main() {
         .version("0.1.0")
         .about("Simple standalone webserver which you can upload and download files from")
         .arg(Arg::with_name("filecache_size")
-             .help("In-memory cache of frequently-accessed files in MB (default is 128 MB)")
-             .long("filecache_size")
-             .takes_value(true)
-             .value_name("CACHE_SIZE"))
+            .help("In-memory cache of frequently-accessed files in MB (default is 128 MB)")
+            .long("filecache_size")
+            .takes_value(true)
+            .value_name("CACHE_SIZE"))
         .arg(Arg::with_name("generate_sha256")
-             .long("generate_sha256")
-             .help("Generate SHA256 hashes for each uploaded file"))
+            .long("generate_sha256")
+            .help("Generate SHA256 hashes for each uploaded file"))
         .get_matches();
     let filecache_size = value_t!(matches, "filecache_size", usize).unwrap_or(128);
     println!("Using {} MB file cache", filecache_size);
@@ -297,7 +317,7 @@ fn main() {
         Err(error) => {
             eprintln!("Could not create ./{} directory: {}", UPLOADS_DIR, error);
             process::exit(1);
-        },
+        }
         Ok(_) => {
             if matches.is_present("generate_sha256") {
                 if let Ok(entries) = fs::read_dir(UPLOADS_DIR) {
@@ -307,7 +327,7 @@ fn main() {
                         .filter(|path| {
                             match path.extension() {
                                 Some(extension) => extension != SHA256_EXTENSION,
-                                None => true
+                                None => true,
                             }
                         })
                         .collect();
@@ -330,24 +350,30 @@ fn main() {
                             Ok(event) => {
                                 println!("{:?}", event);
                                 match event {
-                                    DebouncedEvent::Create(mut created_path) =>
-                                        write_sha256_ignoring_errors(&mut created_path),
-                                    DebouncedEvent::Write(mut modified_path) =>
-                                        write_sha256_ignoring_errors(&mut modified_path),
-                                    DebouncedEvent::Rename(_, mut after_path) =>
-                                        write_sha256_ignoring_errors(&mut after_path),
-                                    _ => continue
+                                    DebouncedEvent::Create(mut created_path) => {
+                                        write_sha256_ignoring_errors(&mut created_path)
+                                    }
+                                    DebouncedEvent::Write(mut modified_path) => {
+                                        write_sha256_ignoring_errors(&mut modified_path)
+                                    }
+                                    DebouncedEvent::Rename(_, mut after_path) => {
+                                        write_sha256_ignoring_errors(&mut after_path)
+                                    }
+                                    _ => continue,
 
                                 };
-                            },
+                            }
                             Err(e) => println!("watch error: {:?}", e),
                         }
                     }
                 });
             }
-            let cache: Cache = CacheBuilder::new().size_limit(1024 * 1024 * filecache_size).build().unwrap();
-            rocket::ignite().manage(cache)
-                .mount("/", routes![files, index, list, upload_binary, upload_form]).launch();
+            let cache: Cache =
+                CacheBuilder::new().size_limit(1024 * 1024 * filecache_size).build().unwrap();
+            rocket::ignite()
+                .manage(cache)
+                .mount("/", routes![files, index, list, upload_binary, upload_form])
+                .launch();
         }
     }
 }
