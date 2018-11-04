@@ -30,3 +30,7 @@ A simple standalone webserver for which you can upload and download files from.
 * Generate SHA256 hashes for each file in uploads
 
         cargo run --release -- --generate_sha256
+
+* Upload files from commandline:
+
+        curl -X POST --data-binary @file_to_upload.txt http://localhost:8000/file_to_upload.txt

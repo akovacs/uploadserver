@@ -116,10 +116,10 @@ fn index() -> content::Html<&'static str> {
           }
           .first-row {
             position: absolute; top: 0; left: 0; left: 0; right: 0;
-            height: 8em; margin: 10px;
+            height: 10em; margin: 10px;
           }
           .second-row {
-            position: absolute; top: 8em; left: 0; right: 0; bottom: 0;
+            position: absolute; top: 10em; left: 0; right: 0; bottom: 0;
           }
           .second-row iframe {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -135,6 +135,7 @@ fn index() -> content::Html<&'static str> {
             <input id="upload" type="submit" value="Upload" />
             <span id="response"></span>
           </p>
+          <p>Or <code>curl -X POST --data-binary @file_to_upload.txt http://localhost:8000/file_to_upload.txt</code></p>
         </form>
       </div>
       <div class="second-row">
