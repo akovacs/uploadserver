@@ -1,5 +1,4 @@
-#![feature(plugin)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 
 extern crate chrono;
 #[macro_use]
@@ -9,6 +8,7 @@ extern crate formdata;
 extern crate mime_guess;
 extern crate notify;
 extern crate pretty_bytes;
+#[macro_use]
 extern crate rocket;
 extern crate rocket_file_cache;
 extern crate time;
@@ -32,7 +32,7 @@ use formdata::FormData;
 use notify::{Watcher, RecursiveMode, watcher, DebouncedEvent};
 use pretty_bytes::converter::convert;
 use rocket::{Data, Outcome, Request, State};
-use rocket::data::{self, FromData};
+use rocket::data::{self, FromDataSimple};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::Headers;
 use rocket::response::content;
@@ -42,7 +42,10 @@ const UPLOADS_DIR: &'static str = "uploads/";
 const SHA256_EXTENSION: &'static str = "sha256";
 
 // Wrap formdata::FormData in order to implement FromData trait
-struct RocketFormData(FormData);
+//#[derive(FromForm)]
+struct RocketFormData{
+  value: FormData
+}
 
 fn from(header_map: &HeaderMap) -> Headers {
     let mut headers = Headers::new();
@@ -53,14 +56,14 @@ fn from(header_map: &HeaderMap) -> Headers {
     headers
 }
 
-impl FromData for RocketFormData {
+impl FromDataSimple for RocketFormData {
     type Error = String;
 
     fn from_data(request: &Request, data: Data) -> data::Outcome<Self, Self::Error> {
         let headers = from(request.headers());
 
         match formdata::read_formdata(&mut data.open(), &headers) {
-            Ok(parsed_form) => return Outcome::Success(RocketFormData(parsed_form)),
+            Ok(parsed_form) => return Outcome::Success(RocketFormData { value: parsed_form }),
             _ => {
                 return Outcome::Failure((Status::BadRequest,
                                          String::from("Failed to read formdata")))
@@ -77,10 +80,10 @@ fn upload_binary(filename: String, data: Data) -> io::Result<String> {
 
 #[post("/", format = "multipart/form-data", data = "<upload>")]
 fn upload_form(upload: RocketFormData) -> io::Result<String> {
-    for (name, value) in upload.0.fields {
+    for (name, value) in upload.value.fields {
         println!("Posted field name={} value={}", name, value);
     }
-    for (name, mut file) in upload.0.files {
+    for (name, mut file) in upload.value.files {
         // file.do_not_delete_on_drop(); // don't delete temporary file
         let filename = match file.filename() {
             Ok(Some(original_filename)) => original_filename,

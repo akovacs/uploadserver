@@ -2,6 +2,7 @@
 name = "upload_server"
 version = "0.1.0"
 authors = ["Arpad Kovacs <minhmeoke@gmail.com>"]
+edition = "2015"
 
 [dependencies]
 chrono = "0.4.0"
@@ -11,7 +12,7 @@ formdata = "0.12.2"
 mime_guess = "1.8.3"
 notify = "4.0.3"
 pretty-bytes = "0.2.2"
-rocket = "0.3.6"
-rocket_codegen = "0.3.6"
-rocket-file-cache = "1.0.0-beta"
+rocket = "0.4.0"
+rocket_codegen = "0.4.0"
+rocket-file-cache = { git = "https://github.com/akovacs/rocket-file-cache" }
 time = "0.1.39"
