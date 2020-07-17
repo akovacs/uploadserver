@@ -1,6 +1,6 @@
 import os, errno
 from flask import Flask, request, redirect, url_for, send_from_directory
-from werkzeug import secure_filename
+from werkzeug.utils import secure_filename
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = set(['txt', 'zip', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
