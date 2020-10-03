@@ -10,7 +10,6 @@ extern crate notify;
 extern crate pretty_bytes;
 #[macro_use]
 extern crate rocket;
-extern crate rocket_file_cache;
 extern crate time;
 
 use std::borrow::Cow;
@@ -35,8 +34,7 @@ use rocket::{Data, Outcome, Request, State};
 use rocket::data::{self, FromDataSimple};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::Headers;
-use rocket::response::content;
-use rocket_file_cache::{Cache, CacheBuilder, CachedFile};
+use rocket::response::{content, NamedFile};
 
 const UPLOADS_DIR: &'static str = "uploads/";
 const SHA256_EXTENSION: &'static str = "sha256";
@@ -195,8 +193,8 @@ fn index() -> content::Html<&'static str> {
 }
 
 #[get("/uploads/<file..>")]
-fn files(file: PathBuf, cache: State<Cache>) -> CachedFile {
-    CachedFile::open(Path::new(UPLOADS_DIR).join(file), cache.inner())
+fn files(file: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(Path::new(UPLOADS_DIR).join(file)).ok()
 }
 
 fn create_upload_directory() -> io::Result<bool> {
@@ -305,17 +303,10 @@ fn main() {
     let matches = App::new("Fileserver")
         .version("0.1.0")
         .about("Simple standalone webserver which you can upload and download files from")
-        .arg(Arg::with_name("filecache_size")
-            .help("In-memory cache of frequently-accessed files in MB (default is 128 MB)")
-            .long("filecache_size")
-            .takes_value(true)
-            .value_name("CACHE_SIZE"))
         .arg(Arg::with_name("generate_sha256")
             .long("generate_sha256")
             .help("Generate SHA256 hashes for each uploaded file"))
         .get_matches();
-    let filecache_size = value_t!(matches, "filecache_size", usize).unwrap_or(128);
-    println!("Using {} MB file cache", filecache_size);
 
     match create_upload_directory() {
         Err(error) => {
@@ -372,10 +363,7 @@ fn main() {
                     }
                 });
             }
-            let cache: Cache =
-                CacheBuilder::new().size_limit(1024 * 1024 * filecache_size).build().unwrap();
             rocket::ignite()
-                .manage(cache)
                 .mount("/", routes![files, index, list, upload_binary, upload_form])
                 .launch();
         }
