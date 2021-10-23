@@ -18,14 +18,15 @@ A simple standalone webserver for which you can upload and download files from.
 
         cargo run --release
 
+   Or alternatively if you have multiple toolchains installed:
+
+        cargo run --release --target x86_64-unknown-linux-gnu
+
 4. Browse to http://localhost:8000 to upload and download files.
 
     ![Upload server web interface](/doc/uploadserver.png)
 
 # Advanced
-* Specify size of in-memory cache (in MB) for serving frequently-accessed files:
-
-        cargo run --release -- --filecache_size=1024
 
 * Generate SHA256 hashes for each file in uploads
 
