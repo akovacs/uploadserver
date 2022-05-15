@@ -1,7 +1,9 @@
+cargo-features = ["strip"]
+
 [package]
 name = "upload_server"
 version = "0.1.0"
-authors = ["Arpad Kovacs <minhmeoke@gmail.com>"]
+authors = ["Arpad Kovacs <akovacs@alumni.stanford.edu>"]
 edition = "2015"
 
 [dependencies]
@@ -15,3 +17,10 @@ pretty-bytes = "0.2.2"
 rocket = "0.4.9"
 rocket_codegen = "0.4.9"
 time = "0.1.39"
+
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
+lto = "fat"   # Optimize at link stage, removing dead code and reducing binary size.
+              # Performs "fat" LTO which attempts to perform optimizations across all
+              # crates within the dependency graph.
+codegen-units = 1  # Reduce parallelism to allow maximum size reduction optimizations.

@@ -1,4 +1,4 @@
-A simple standalone webserver for which you can upload and download files from.
+A simple standalone webserver which you can upload and download files from.
 
 # Setup
 1. Install rust toolchain manager:
@@ -6,25 +6,41 @@ A simple standalone webserver for which you can upload and download files from.
         # Arch Linux
         sudo pacman -S rustup
 
-        # Other distributions
+        # Other Linux Distributions
         curl https://sh.rustup.rs -sSf | sh
 
-2. Download rust nightly compiler:
+   On Windows: [Download](https://rust-lang.github.io/rustup/installation/other.html) and run the `rustup-init.exe` built
+   for the `x86_64-pc-windows-msvc` target
+
+2. Download the rust nightly compiler (at least v1.45 or higher):
 
         rustup install nightly
         rustup default nightly
 
-3. Compile and execute the server:
+3. Clone the repository:
 
+        git clone https://github.com/akovacs/uploadserver
+
+4. Compile and execute the server:
+
+        cd uploadserver
         cargo run --release
 
    Or alternatively if you have multiple toolchains installed:
 
+        # For Linux x86-64
         cargo run --release --target x86_64-unknown-linux-gnu
 
-4. Browse to http://localhost:8000 to upload and download files.
+        # For Windows x86-64
+        cargo run --release --target x86_64-pc-windows-msvc
+
+5. Browse to port 8000 at your IP address, for example: http://localhost:8000
+   to upload and download files.
 
     ![Upload server web interface](/doc/uploadserver.png)
+
+6. Uploaded files will be added to the `uploads` directory.
+
 
 # Advanced
 
