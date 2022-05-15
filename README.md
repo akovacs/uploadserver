@@ -51,3 +51,17 @@ A simple standalone webserver which you can upload and download files from.
 * Upload files from commandline:
 
         curl -X POST --data-binary @file_to_upload.txt http://localhost:8000/file_to_upload.txt
+
+
+# Statically-Linked Binary
+
+The following commands build a statically-linked Linux binary without shared library dependencies. This can be useful for embedded systems or other applications where you do not want to rely on libgcc, libc, libpthread, and other dependencies which can break due to version changes. Note that performance may be lower than the dynamically-linked binaries described above.
+
+1. Add musl toolchain
+
+        rustup target add x86_64-unknown-linux-musl
+        sudo apt install musl-tools
+
+2. Compile Linux binary using musl toolchain
+
+        RUSTFLAGS='-C link-arg=-s' cargo build --release --target x86_64-unknown-linux-musl
