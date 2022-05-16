@@ -24,3 +24,6 @@ lto = "fat"   # Optimize at link stage, removing dead code and reducing binary s
               # Performs "fat" LTO which attempts to perform optimizations across all
               # crates within the dependency graph.
 codegen-units = 1  # Reduce parallelism to allow maximum size reduction optimizations.
+
+[target.x86_64-apple-darwin]
+rustflags=["-C", "link-arg=-mmacosx-version-min=10.7"]
