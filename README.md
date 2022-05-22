@@ -1,6 +1,14 @@
-A simple standalone webserver which you can upload and download files from.
+A simple standalone webserver which you can upload and download files to/from
+using just a web browser. By running just one instance of the uploadserver,
+you can transfer files between devices on your local network without
+installing anything on them.
 
-# Setup
+# Ready-to-run Binaries
+Compiling the source code for your machine by following the steps below will
+optimize the server to use your machine to its full capability. However, if you
+are lazy or in a hurry, you can [download pre-built binaries on the Releases page](https://github.com/akovacs/uploadserver/releases).
+
+# Setup Rust Toolchain and Compile for your machine
 1. Install rust toolchain manager:
 
         # Arch Linux
@@ -9,8 +17,8 @@ A simple standalone webserver which you can upload and download files from.
         # Other Linux Distributions
         curl https://sh.rustup.rs -sSf | sh
 
-   On Windows: [Download](https://rust-lang.github.io/rustup/installation/other.html) and run the `rustup-init.exe` built
-   for the `x86_64-pc-windows-msvc` target
+   On Windows: [Download](https://rust-lang.github.io/rustup/installation/other.html)
+   and run the `rustup-init.exe` built for the `x86_64-pc-windows-msvc` target
 
 2. Download the rust nightly compiler (at least v1.45 or higher):
 
