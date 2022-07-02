@@ -10,9 +10,11 @@ extern crate notify;
 extern crate pretty_bytes;
 #[macro_use]
 extern crate rocket;
+extern crate rocket_basicauth;
 extern crate time;
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
@@ -34,10 +36,24 @@ use rocket::{Data, Outcome, Request, State};
 use rocket::data::{self, FromDataSimple};
 use rocket::http::{HeaderMap, Status};
 use rocket::http::hyper::header::Headers;
-use rocket::response::{content, NamedFile};
+use rocket::response::{content, NamedFile, Response};
+use rocket_basicauth::BasicAuth;
 
 const UPLOADS_DIR: &'static str = "uploads/";
 const SHA256_EXTENSION: &'static str = "sha256";
+
+// #[derive(Clone,Debug)]
+struct AuthorizedUser {
+  name: String,
+  // TODO: add cookie after initial authentication
+  password: Vec<String>
+}
+
+// Wrap server configuration for password auth in shared State struct
+// https://rocket.rs/v0.4/guide/state/#state
+struct ServerConfig {
+  users: HashMap<String,AuthorizedUser>
+}
 
 // Wrap formdata::FormData in order to implement FromData trait
 //#[derive(FromForm)]
@@ -306,6 +322,13 @@ fn main() {
         .arg(Arg::with_name("generate_sha256")
             .long("generate_sha256")
             .help("Generate SHA256 hashes for each uploaded file"))
+        .arg(Arg::with_name("password")
+            .long("password")
+            // TODO: customize users via interleaved arguments or config file:
+            // --user admin --password password
+            .help("Protect access via HTTP Basic Authentication and require a password to access files. Default user is admin.")
+            .multiple(true)
+            .min_values(1))
         .get_matches();
 
     match create_upload_directory() {
@@ -314,6 +337,16 @@ fn main() {
             process::exit(1);
         }
         Ok(_) => {
+            let passwords: Vec<String> = match matches.values_of("password") {
+               Some(passwds) => { passwds.map(|passwd| passwd.to_string()).collect() }
+               None => { vec![] }
+            };
+            if &passwords.len() > &0 {
+                println!("Authorized Passwords: {:?}", &passwords);
+            }
+            let server_config = ServerConfig {
+                                  users: HashMap::from([(String::from("admin"), AuthorizedUser { name: String::from("admin"), password: passwords })])
+                                };
             if matches.is_present("generate_sha256") {
                 if let Ok(entries) = fs::read_dir(UPLOADS_DIR) {
                     let mut paths_to_hash: Vec<_> = entries.filter_map(|entry| entry.ok())
@@ -364,6 +397,7 @@ fn main() {
                 });
             }
             rocket::ignite()
+                .manage(server_config)
                 .mount("/", routes![files, index, list, upload_binary, upload_form])
                 .launch();
         }

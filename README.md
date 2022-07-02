@@ -52,6 +52,10 @@ are lazy or in a hurry, you can [download pre-built binaries on the Releases pag
 
 # Advanced
 
+* Password protect files via HTTP Basic Authentication (username: admin, specify 1+ passwords)
+
+        cargo run --release -- --password=mypassword
+
 * Generate SHA256 hashes for each file in uploads
 
         cargo run --release -- --generate_sha256
