@@ -52,17 +52,38 @@ are lazy or in a hurry, you can [download pre-built binaries on the Releases pag
 
 # Advanced
 
+* Upload files from commandline:
+
+        curl -X POST --data-binary @file_to_upload.txt http://localhost:8000/file_to_upload.txt
+
+
+* Download files from commandline:
+
+        curl http://localhost:8000/uploads/file_to_upload.txt --output download.txt
+
+        wget http://localhost:8000/uploads/file_to_upload.txt
+
+
 * Password protect files via HTTP Basic Authentication (username: admin, specify 1+ passwords)
 
+        # Start uploadserver with password-protected basic authentication
         cargo run --release -- --password=mypassword
+
+        # Upload a file using basic authentication with password
+        curl --basic --user admin:mypassword -X POST --data-binary @file_to_upload.txt http://localhost:8000/file_to_upload.txt
+
+        # Failed attempt to download a file without providing the password
+        wget http://localhost:8000/uploads/file_to_upload.txt
+        # HTTP request sent, awaiting response... 401 Unauthorized
+
+        # Successful download using basic authentication with password
+        wget --http-user=admin --http-password=mypassword http://0.0.0.0:8000/uploads/file_to_upload.txt
+        # HTTP request sent, awaiting response... 200 OK
+
 
 * Generate SHA256 hashes for each file in uploads
 
         cargo run --release -- --generate_sha256
-
-* Upload files from commandline:
-
-        curl -X POST --data-binary @file_to_upload.txt http://localhost:8000/file_to_upload.txt
 
 
 # Statically-Linked Linux Binary

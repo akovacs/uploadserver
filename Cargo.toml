@@ -2,9 +2,9 @@ cargo-features = ["strip"]
 
 [package]
 name = "upload_server"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Arpad Kovacs <akovacs@alumni.stanford.edu>"]
-edition = "2015"
+edition = "2018"
 
 [dependencies]
 chrono = "0.4.0"
@@ -15,7 +15,7 @@ notify = "4.0.3"
 pretty-bytes = "0.2.2"
 rocket = "0.4.9"
 rocket_codegen = "0.4.9"
-rocket-basicauth = "1"
+rocket-basicauth = { version = "1" } #, path = "../rocket-basicauth" }
 rust-crypto = "0.2.36"
 time = "0.1.39"
 

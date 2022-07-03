@@ -32,15 +32,23 @@ use crypto::sha2::Sha256;
 use formdata::FormData;
 use notify::{Watcher, RecursiveMode, watcher, DebouncedEvent};
 use pretty_bytes::converter::convert;
-use rocket::{Data, Outcome, Request, State};
+use rocket::{Data, Outcome, State};
 use rocket::data::{self, FromDataSimple};
-use rocket::http::{HeaderMap, Status};
-use rocket::http::hyper::header::Headers;
-use rocket::response::{content, NamedFile, Response};
+use rocket::http::{self, Header, HeaderMap, Status};
+use rocket::http::hyper::header::{Headers, Authorization};
+use rocket::request::{self, Request, FromRequest};
+use rocket::response::{content, status, NamedFile, Redirect, Response, Responder};
+use rocket::response::status::Unauthorized;
 use rocket_basicauth::BasicAuth;
 
 const UPLOADS_DIR: &'static str = "uploads/";
 const SHA256_EXTENSION: &'static str = "sha256";
+
+
+// Custom Authenticated type which we implement FromData for
+// in order to guard protected endpoints
+// https://github.com/SergioBenitez/Rocket/issues/99
+struct Authenticated {}
 
 // #[derive(Clone,Debug)]
 struct AuthorizedUser {
@@ -77,9 +85,9 @@ impl FromDataSimple for RocketFormData {
         let headers = from(request.headers());
 
         match formdata::read_formdata(&mut data.open(), &headers) {
-            Ok(parsed_form) => return Outcome::Success(RocketFormData { value: parsed_form }),
+            Ok(parsed_form) => return data::Outcome::Success(RocketFormData { value: parsed_form }),
             _ => {
-                return Outcome::Failure((Status::BadRequest,
+                return data::Outcome::Failure((Status::BadRequest,
                                          String::from("Failed to read formdata")))
             }
         };
@@ -87,13 +95,13 @@ impl FromDataSimple for RocketFormData {
 }
 
 #[post("/<filename>", data = "<data>")]
-fn upload_binary(filename: String, data: Data) -> io::Result<String> {
+fn upload_binary(_auth: Authenticated, filename: String, data: Data) -> io::Result<String> {
     data.stream_to_file(format!("{}/{}", UPLOADS_DIR, filename))
         .map(|numbytes| format!("Uploaded {} bytes as {}", numbytes.to_string(), filename))
 }
 
 #[post("/", format = "multipart/form-data", data = "<upload>")]
-fn upload_form(upload: RocketFormData) -> io::Result<String> {
+fn upload_form(_auth: Authenticated, upload: RocketFormData) -> io::Result<String> {
     for (name, value) in upload.value.fields {
         println!("Posted field name={} value={}", name, value);
     }
@@ -121,9 +129,102 @@ fn upload_form(upload: RocketFormData) -> io::Result<String> {
     return Err(io::Error::new(io::ErrorKind::InvalidInput, "No files uploaded"));
 }
 
+
+// Request guard for basic auth check
+// TODO: reenable after upgrading to rocket 0.5
+// #[rocket::async_trait]
+// impl<'r> FromRequest<'r> for Authenticated {
+impl<'a, 'r> FromRequest<'a, 'r> for Authenticated {
+    type Error = &'static str;
+    // TODO: async after upgrading to rocket 0.5
+    // async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+    fn from_request(req: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+        // Change when upgrading to rocket 0.5
+        // let server_config = req.rocket().state::<ServerConfig>().unwrap();
+        let server_config = req.guard::<State<ServerConfig>>().unwrap();
+        if server_config.users.is_empty() {
+            println!("No users are configured, bypassing basic authentication check");
+            return request::Outcome::Success(Authenticated {});
+        }
+
+        // let auth = req.guard::<BasicAuth>().await;
+        let auth = req.guard::<BasicAuth>();
+
+        let basic_auth_username = match auth {
+            // auth.name becomes auth.username in later versions of BasicAuth
+            // request::Outcome::Success(ref a) => a.username.as_str(),
+            request::Outcome::Success(ref a) => a.name.as_str(),
+            _ => "",
+        };
+
+        let basic_auth_password = match auth {
+            request::Outcome::Success(ref a) => a.password.as_str(),
+            _ => "",
+        };
+
+        match server_config.users.get(&basic_auth_username.to_string()) {
+            Some(authorized_user) => {
+                // TODO: constant time password check?
+                if authorized_user.password.contains(&basic_auth_password.to_string()) {
+                    println!("Successful login for user {}", &authorized_user.name);
+                    return request::Outcome::Success(Authenticated {});
+                } else {
+                    println!("Failed Login attempt with incorrect password for {}", &authorized_user.name);
+                    return request::Outcome::Failure((
+                        http::Status::Unauthorized,
+                        "Auth check failed. Please perform HTTP basic auth with the correct username and password.",
+                    ));
+                }
+            },
+            _ => {
+                return request::Outcome::Failure((
+                    http::Status::Unauthorized,
+                    "Auth check failed. Please perform HTTP basic auth with the correct username and password.",
+                ));
+            }
+        }
+    }
+}
+
+// Catches 401 Unauthorized errors and respond with a request to the client for basic auth login
+#[catch(401)]
+fn unauthorized_catcher<'r: 'r>() -> impl Responder<'r> {
+    struct Resp {}
+    impl<'r: 'r> Responder<'r> for Resp {
+        fn respond_to(
+            self,
+            _request: &Request,
+        ) -> Result<rocket::Response<'r>, rocket::http::Status> {
+            Ok(Response::build()
+                   .header(Header::new("WWW-Authenticate", "Basic realm=\"UploadServer Login\", charset=\"UTF-8\""))
+                   .status(http::Status::Unauthorized)
+                   .finalize())
+        }
+    }
+    Resp {}
+}
+
+
 #[get("/")]
-fn index() -> content::Html<&'static str> {
-    content::Html(r#"
+fn index(_auth: Authenticated, server_config: State<ServerConfig>) -> Result<content::Html<&'static str>, Response> {
+    // For 3+ possible responses, derive a custom Responder enum
+    // https://rocket.rs/master/guide/faq/#multiple-responses
+    // https://github.com/SergioBenitez/Rocket/issues/253
+    // TODO: factor out into dedicated function
+    // TODO: auth.name becomes auth.username in later versions of BasicAuth
+
+    // println!("Basic Auth {:?}", &auth);
+    // match server_config.users.get(&auth.name) {
+    //     Some(authorized_user) => {
+    //         println!("Matched Authorized User {:?}", &authorized_user.name);
+    //     },
+    //     _ => { return Err(Response::build()
+    //                      .status(Status::Unauthorized)
+    //                      .raw_header("WWW-Authenticate", "Basic realm=\"UploadServer Login\", charset=\"UTF-8\"")
+    //                      .finalize()) }
+    // }
+
+    return Ok(content::Html(r#"
     <!doctype html>
       <head>
         <title>Upload a file</title>
@@ -205,11 +306,11 @@ fn index() -> content::Html<&'static str> {
       }
       </script>
     </html>
-  "#)
+  "#))
 }
 
 #[get("/uploads/<file..>")]
-fn files(file: PathBuf) -> Option<NamedFile> {
+fn files(_auth: Authenticated, file: PathBuf) -> Option<NamedFile> {
     NamedFile::open(Path::new(UPLOADS_DIR).join(file)).ok()
 }
 
@@ -219,7 +320,7 @@ fn create_upload_directory() -> io::Result<bool> {
 }
 
 #[get("/list")]
-fn list() -> content::Html<String> {
+fn list(_auth: Authenticated) -> content::Html<String> {
     if let Ok(entries) = fs::read_dir(UPLOADS_DIR) {
         let mut table = vec![String::from(r#"
         <table border="1">
@@ -337,16 +438,18 @@ fn main() {
             process::exit(1);
         }
         Ok(_) => {
-            let passwords: Vec<String> = match matches.values_of("password") {
-               Some(passwds) => { passwds.map(|passwd| passwd.to_string()).collect() }
-               None => { vec![] }
+            let server_config: ServerConfig = match matches.values_of("password") {
+               Some(passwds) => {
+                   let passwords = passwds.map(|passwd| passwd.to_string()).collect();
+                   // if &passwords.len() > &0 {
+                   //     println!("Authorized Passwords: {:?}", &passwords);
+                   // }
+                   ServerConfig {
+                       users: HashMap::from([(String::from("admin"), AuthorizedUser { name: String::from("admin"), password: passwords })])
+                   }
+               }
+               None => { ServerConfig { users: HashMap::new() } }
             };
-            if &passwords.len() > &0 {
-                println!("Authorized Passwords: {:?}", &passwords);
-            }
-            let server_config = ServerConfig {
-                                  users: HashMap::from([(String::from("admin"), AuthorizedUser { name: String::from("admin"), password: passwords })])
-                                };
             if matches.is_present("generate_sha256") {
                 if let Ok(entries) = fs::read_dir(UPLOADS_DIR) {
                     let mut paths_to_hash: Vec<_> = entries.filter_map(|entry| entry.ok())
@@ -399,6 +502,9 @@ fn main() {
             rocket::ignite()
                 .manage(server_config)
                 .mount("/", routes![files, index, list, upload_binary, upload_form])
+                // Upgrade for 0.5:
+                // .register("/", catchers![unauthorized_catcher,])
+                .register(catchers![unauthorized_catcher,])
                 .launch();
         }
     }
