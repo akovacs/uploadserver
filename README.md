@@ -85,6 +85,19 @@ are lazy or in a hurry, you can [download pre-built binaries on the Releases pag
 
         cargo run --release -- --generate_sha256
 
+# Using UploadServer with IPv6 Addressing
+
+* UploadServer is currently built using an IPv4-based Rocket framework. To access the server using IPv6, you can use the socat relay tool to forward incoming IPv6 connections which are requesting port 8001 to port 8000 on IPv4 localhost (127.0.0.1), and run uploadserver on port 8000.
+
+        sudo apt install socat
+        socat TCP6-LISTEN:8001,fork,reuseaddr TCP4:127.0.0.1:8000
+
+* Then in another terminal instance, start uploadserver on port 8000:
+
+        cargo run --release
+
+* To access the uploadserver, execute the commands posted above, then connect to port 8001 using IPv6. For example, you can open [http://[::1]:8001](http://[::1]:8001) in your browser to access uploadserver from the IPv6 loopback address `[::1]`, equivalent to the IPv4 address `127.0.0.1`, which refers to the localhost.
+
 
 # Statically-Linked Linux Binary
 
