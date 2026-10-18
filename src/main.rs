@@ -40,6 +40,7 @@ use rocket::request::{self, Request, FromRequest};
 use rocket::response::{content, status, NamedFile, Redirect, Response, Responder};
 use rocket::response::status::Unauthorized;
 use rocket_basicauth::BasicAuth;
+use time::OffsetDateTime;
 
 const UPLOADS_DIR: &'static str = "uploads/";
 const SHA256_EXTENSION: &'static str = "sha256";
@@ -109,7 +110,8 @@ fn upload_form(_auth: Authenticated, upload: RocketFormData) -> io::Result<Strin
         // file.do_not_delete_on_drop(); // don't delete temporary file
         let filename = match file.filename() {
             Ok(Some(original_filename)) => original_filename,
-            _ => time::now().to_timespec().sec.to_string(),
+            // Convert to seconds elapsed since Unix epoch midnight Jan 1, 1970.
+              _ => OffsetDateTime::now_local().unix_timestamp().to_string(),
         };
         println!("Posted file fieldname={} name={} path={:?}",
                  name,
