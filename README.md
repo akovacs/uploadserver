@@ -86,17 +86,24 @@ are lazy or in a hurry, you can [download pre-built binaries on the Releases pag
         cargo run --release -- --generate_sha256
 
 # Using UploadServer with IPv6 Addressing
+* First time: If this is your first time trying out IPv6, first run the test python webserver `http.server` on port 8001, and verify that you can reach it from your browser via IPv6 at [http://\[::1\]:8001](http://&lbrack;::1&rbrack;:8001).  `[::1]` is the IPv6 loopback address, equivalent to the IPv4 address `127.0.0.1`, which refers to the localhost. This sanity check verifies that no firewalls are blocking your browser from connecting to a server running on the same machine. Ctrl+C to terminate the server once you are done testing it.
+
+        python3 -m http.server 8001 --bind ::
 
 * UploadServer is currently built using an IPv4-based Rocket framework. To access the server using IPv6, you can use the socat relay tool to forward incoming IPv6 connections which are requesting port 8001 to port 8000 on IPv4 localhost (127.0.0.1), and run uploadserver on port 8000.
 
         sudo apt install socat
         socat TCP6-LISTEN:8001,fork,reuseaddr TCP4:127.0.0.1:8000
 
-* Then in another terminal instance, start uploadserver on port 8000:
+* First time: Then in another terminal instance, start the python IPv4 `http.server` on port 8000 to test the socat relay setup:
+
+        python3 -m http.server 8000
+
+* If you can reach the IPv4 python http.server through socat by opening [http://\[::1\]:8001](http://&lbrack;::1&rbrack;:8001) in your browser, then kill the python3 `http.server` using Ctrl+C and start uploadserver on port 8000:
 
         cargo run --release
 
-* To access the uploadserver, execute the commands posted above, then connect to port 8001 using IPv6. For example, you can open [http://[::1]:8001](http://[::1]:8001) in your browser to access uploadserver from the IPv6 loopback address `[::1]`, equivalent to the IPv4 address `127.0.0.1`, which refers to the localhost.
+* Final summary: To access the uploadserver, execute the commands posted here, then connect from your browser to port 8001 using IPv6. For example, you can open [http://\[::1\]:8001](http://&lbrack;::1&rbrack;:8001) in your browser to access uploadserver. Replace `[::1]` with the IPv6 address that the server is operating from, in brackets.
 
 
 # Statically-Linked Linux Binary
