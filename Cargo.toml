@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.0"
-clap = "2.29.2"
+clap = "3.0.13"
 formdata = "0.12.2"
 mime_guess = "1.8.3"
 notify = "4.0.3"
@@ -17,6 +17,7 @@ rocket = "0.4.9"
 rocket_codegen = "0.4.9"
 rocket-basicauth = { version = "1" } #, path = "../rocket-basicauth" }
 rust-crypto = "0.2.36"
+textwrap = "0.14.2"
 time = "0.2.23"
 
 [profile.release]
