@@ -52,19 +52,19 @@ are lazy or in a hurry, you can [download pre-built binaries on the Releases pag
 
 # Advanced
 
-* Upload files from commandline:
+* Upload files from commandline (since v1.0.0):
 
         curl -X POST --data-binary @file_to_upload.txt http://localhost:8000/file_to_upload.txt
 
 
-* Download files from commandline:
+* Download files from commandline (since v1.0.0):
 
         curl http://localhost:8000/uploads/file_to_upload.txt --output download.txt
 
         wget http://localhost:8000/uploads/file_to_upload.txt
 
 
-* Password protect files via HTTP Basic Authentication (username: admin, specify 1+ passwords)
+* Password protect files via HTTP Basic Authentication (username: admin, specify 1+ passwords) (since v1.0.1):
 
         # Start uploadserver with password-protected basic authentication
         cargo run --release -- --password=mypassword
@@ -81,7 +81,7 @@ are lazy or in a hurry, you can [download pre-built binaries on the Releases pag
         # HTTP request sent, awaiting response... 200 OK
 
 
-* Generate SHA256 hashes for each file in uploads
+* Generate SHA256 hashes for each file in uploads (since v1.0.0):
 
         cargo run --release -- --generate_sha256
 
@@ -108,7 +108,7 @@ are lazy or in a hurry, you can [download pre-built binaries on the Releases pag
 
 # Statically-Linked Linux Binary
 
-The following commands build a statically-linked Linux binary without shared library dependencies. This can be useful when distributing the binary to multiple different Linux distributions or to different versions of a Linux distribution, since libgcc, libc, libpthread, and other dependencies can break due to version changes.
+The following commands build a statically-linked Linux binary without shared library dependencies (available since v1.0.0). This can be useful when distributing the binary to multiple different Linux distributions or to different versions of a Linux distribution, since libgcc, libc, libpthread, and other dependencies can break due to version changes.
 
 ```
 /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.33' not found
