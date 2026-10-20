@@ -6,21 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Changelog notes for each version may be split into:
 
-- Breaking changes: user-visible changes which may require updates in downstream components.
-- Compatibility: which compiler and dependency versions are supported.
-- Features: new functionality, or backwards-compatible changes in existing functionality.
-- Fixes: bugfixes, security fixes, removing sharp edges.
-- Performance: performance-oriented improvements: memory-usage, cpu usage, etc.
-- Releases: ready-to-run compiled binaries which may be distributed via Github Releases
+ - Breaking changes: user-visible changes which may require updates in downstream components.
+ - Compatibility: which compiler and dependency versions are supported.
+ - Features: new functionality, or backwards-compatible changes in existing functionality.
+ - Fixes: bugfixes, security fixes, removing sharp edges.
+ - Performance: performance-oriented improvements: memory-usage, cpu usage, etc.
+ - Releases: ready-to-run compiled binaries which may be distributed via Github Releases
     or other distribution systems.
+
+
+## [1.0.1] - 2026-10-17
+
+### Features
+
+ - Includes rudimentary password protection functionality using --password=mypassword option which enables HTTP Basic Authentication.
+
+### Compatibility: Compiled using
+ - cargo 1.85.0-nightly (769f622e1 2024-12-14)
+ - rustc 1.85.0-nightly (0aeaa5eb2 2024-12-14)
 
 ## [1.0.0] - 2022-05-15
 
 ### Features
 
-- Initial release of server which lists `uploads/` directory with links to downloadable files. - "Select a file to upload" form which permits you to choose a file and automatically upload it to the server as an HTTP POST via in-browser Javascript/ECMAScript or commandline tools like curl.
-- Includes rudimentary password protection functionality using --password=mypassword option which enables HTTP Basic Authentication.
-- Includes --generate_sha256 option to generate SHA256 hashes for each file added to the uploads directory.
+ - Initial release of server which lists `uploads/` directory with links to downloadable files. - "Select a file to upload" form which permits you to choose a file and automatically upload it to the server as an HTTP POST via in-browser Javascript/ECMAScript or commandline tools like curl.
+ - Includes `--generate_sha256` option to generate SHA256 hashes for each file added to the uploads directory.
 
 ### Performance
 
@@ -28,9 +38,9 @@ Changelog notes for each version may be split into:
 
 ### Releases
 
- - uploadserver-x86_64-linux (2.80 MB): statically linked using musl libc for 64-bit GNU/Linux (tested on Ubuntu 22.04)
- - uploadserver-x86_64-osx (2.31 MB): for 64-bit Intel Mac OS X (supports 10.7 Lion and higher, tested on 10.11 El Capitan)
- - uploadserver-x86_64-windows.exe (2.52 MB): for 64-bit Windows (tested on Windows 10)
+ - `uploadserver-x86_64-linux` (2.80 MB): statically linked using musl libc for 64-bit GNU/Linux (tested on Ubuntu 22.04)
+ - `uploadserver-x86_64-osx` (2.31 MB): for 64-bit Intel Mac OS X (supports 10.7 Lion and higher, tested on 10.11 El Capitan)
+ - `uploadserver-x86_64-windows.exe` (2.52 MB): for 64-bit Windows (tested on Windows 10)
 
 ```
 sha256sum *
