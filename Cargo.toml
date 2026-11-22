@@ -9,12 +9,15 @@ edition = "2018"
 [dependencies]
 chrono = "0.4.0"
 clap = "2.29.2"
-formdata = "0.12.2"
+# formdata = { version = "0.14.0-rust-2018-edition", path = "../formdata-hyper-upgrade" }
+encoding_rs = "0.8.34"
+formdata = { version = "0.14.0-rust-2018-edition", path = "../formdata-mime-multipart-hyper1" }
+http = "0.2.9"
 mime_guess = "1.8.3"
 notify = "4.0.3"
 pretty-bytes = "0.2.2"
-rocket = "0.4.9"
-rocket_codegen = "0.4.9"
+rocket = "0.4.11"
+rocket_codegen = "0.4.11"
 rocket-basicauth = { version = "1" } #, path = "../rocket-basicauth" }
 rust-crypto = "0.2.36"
 time = "0.2.23"

@@ -5,6 +5,7 @@ extern crate chrono;
 extern crate clap;
 extern crate crypto;
 extern crate formdata;
+extern crate http;
 extern crate mime_guess;
 extern crate notify;
 extern crate pretty_bytes;
@@ -30,11 +31,15 @@ use clap::{App, Arg};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use formdata::FormData;
+use http::header::HeaderMap as HttpHeaderMap;
+use http::header::HeaderName as HttpHeaderName;
+use http::header::HeaderValue as HttpHeaderValue;
 use notify::{Watcher, RecursiveMode, watcher, DebouncedEvent};
 use pretty_bytes::converter::convert;
 use rocket::{Data, Outcome, State};
 use rocket::data::{self, FromDataSimple};
-use rocket::http::{self, Header, HeaderMap, Status};
+use rocket::http::{Header, HeaderMap, Status};
+use rocket::http::Status as RocketHttpStatus;
 use rocket::http::hyper::header::{Headers, Authorization};
 use rocket::request::{self, Request, FromRequest};
 use rocket::response::{content, status, NamedFile, Redirect, Response, Responder};
@@ -70,22 +75,26 @@ struct RocketFormData{
   value: FormData
 }
 
-fn from(header_map: &HeaderMap) -> Headers {
-    let mut headers = Headers::new();
-    for header in header_map.iter() {
-        let header_value: Vec<u8> = header.value().as_bytes().to_owned();
-        headers.append_raw(String::from(header.name()), header_value);
-    }
-    headers
-}
 
 impl FromDataSimple for RocketFormData {
     type Error = String;
 
     fn from_data(request: &Request, data: Data) -> data::Outcome<Self, Self::Error> {
-        let headers = from(request.headers());
+        // https://github.com/rwf2/Rocket/issues/1498
+        // https://github.com/jespersm/Rocket/commit/fcb59818b9bd7c9da9063cb4dc346c4d7dfb32d5
+        // rocket::http::HeaderMap request.headers() contains an
+        // http::header::HeaderMap inside but it (headers) is private,
+        // therefore we cannot access it directly
+        // TODO: remove this inefficient code (but HeaderMap is probably small)
+        let http_header_map: HttpHeaderMap =
+            request.headers().iter().filter_map(|h| {
+                let name = HttpHeaderName::from_bytes(h.name().as_bytes()).ok()?;
+                let value = HttpHeaderValue::from_str(h.value()).ok()?;
+                Some((name, value))
+            })
+                .collect();
 
-        match formdata::read_formdata(&mut data.open(), &headers) {
+        match formdata::read_formdata(&mut data.open(), &http_header_map) {
             Ok(parsed_form) => return data::Outcome::Success(RocketFormData { value: parsed_form }),
             _ => {
                 return data::Outcome::Failure((Status::BadRequest,
@@ -173,14 +182,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for Authenticated {
                 } else {
                     println!("Failed Login attempt with incorrect password for {}", &authorized_user.name);
                     return request::Outcome::Failure((
-                        http::Status::Unauthorized,
+                        RocketHttpStatus::Unauthorized,
                         "Auth check failed. Please perform HTTP basic auth with the correct username and password.",
                     ));
                 }
             },
             _ => {
                 return request::Outcome::Failure((
-                    http::Status::Unauthorized,
+                    RocketHttpStatus::Unauthorized,
                     "Auth check failed. Please perform HTTP basic auth with the correct username and password.",
                 ));
             }
@@ -196,10 +205,10 @@ fn unauthorized_catcher<'r: 'r>() -> impl Responder<'r> {
         fn respond_to(
             self,
             _request: &Request,
-        ) -> Result<rocket::Response<'r>, rocket::http::Status> {
+        ) -> Result<rocket::Response<'r>, RocketHttpStatus> {
             Ok(Response::build()
                    .header(Header::new("WWW-Authenticate", "Basic realm=\"UploadServer Login\", charset=\"UTF-8\""))
-                   .status(http::Status::Unauthorized)
+                   .status(RocketHttpStatus::Unauthorized)
                    .finalize())
         }
     }
